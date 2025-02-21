@@ -44,11 +44,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.samples.crane.R
 import androidx.compose.samples.crane.base.Result
 import androidx.compose.samples.crane.data.ExploreModel
 import androidx.compose.samples.crane.ui.CraneTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -61,6 +63,10 @@ import com.google.maps.android.ktx.addMarker
 import com.google.maps.android.ktx.awaitMap
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalLifecycleOwner
 
 internal const val KEY_ARG_DETAILS_CITY_NAME = "KEY_ARG_DETAILS_CITY_NAME"
 
@@ -94,6 +100,52 @@ class DetailsActivity : ComponentActivity() {
             }
         }
     }
+}
+
+private fun getMapLifecycleObserver(mapView: MapView): LifecycleEventObserver =
+    LifecycleEventObserver { _, event ->
+        when (event) {
+            Lifecycle.Event.ON_CREATE -> mapView.onCreate(Bundle())
+            Lifecycle.Event.ON_START -> mapView.onStart()
+            Lifecycle.Event.ON_RESUME -> mapView.onResume()
+            Lifecycle.Event.ON_PAUSE -> mapView.onPause()
+            Lifecycle.Event.ON_STOP -> mapView.onStop()
+            Lifecycle.Event.ON_DESTROY -> mapView.onDestroy()
+            else -> throw IllegalStateException()
+        }
+    }
+
+@Composable
+private fun CityMapView(latitude: String, longitude: String) {
+    // The MapView lifecycle is handled by this composable. As the MapView also needs to be updated
+    // with input from Compose UI, those updates are encapsulated into the MapViewContainer
+    // composable. In this way, when an update to the MapView happens, this composable won't
+    // recompose and the MapView won't need to be recreated.
+    val mapView = rememberMapViewWithLifecycle()
+    MapViewContainer(mapView, latitude, longitude)
+
+    @Composable
+    fun rememberMapViewWithLifecycle(): MapView {
+        val context = LocalContext.current
+        val mapView = remember {
+            MapView(context).apply {
+                id = R.id.map
+            }
+        }
+
+        val lifecycle = LocalLifecycleOwner.current.lifecycle
+        DisposableEffect(key1 = lifecycle, key2 = mapView) {
+            // Make MapView follow the current lifecycle
+            val lifecycleObserver = getMapLifecycleObserver(mapView)
+            lifecycle.addObserver(lifecycleObserver)
+            onDispose {
+                lifecycle.removeObserver(lifecycleObserver)
+            }
+        }
+
+        return mapView
+    }
+
 }
 
 @Composable
@@ -133,16 +185,6 @@ fun DetailsContent(
         Spacer(Modifier.height(16.dp))
         CityMapView(exploreModel.city.latitude, exploreModel.city.longitude)
     }
-}
-
-@Composable
-private fun CityMapView(latitude: String, longitude: String) {
-    // The MapView lifecycle is handled by this composable. As the MapView also needs to be updated
-    // with input from Compose UI, those updates are encapsulated into the MapViewContainer
-    // composable. In this way, when an update to the MapView happens, this composable won't
-    // recompose and the MapView won't need to be recreated.
-    val mapView = rememberMapViewWithLifecycle()
-    MapViewContainer(mapView, latitude, longitude)
 }
 
 @Composable
