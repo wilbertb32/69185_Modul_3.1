@@ -56,7 +56,7 @@ class MainViewModel @Inject constructor(
                         .shuffled(Random(people * (1..100).shuffled().first()))
                 }
                 // TODO Codelab: Uncomment
-                //  _suggestedDestinations.value = newDestinations
+                  _suggestedDestinations.value = newDestinations
             }
         }
     }
